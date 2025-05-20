@@ -97,13 +97,13 @@ if (!isset($_SESSION['authenticated'])) {
 }
 
 // Base directory (document root)
-$base_dir = realpath($_SERVER['DOCUMENT_ROOT'] ?? __DIR__);
+$base_dir = realpath(isset($_SERVER['DOCUMENT_ROOT']) ? $_SERVER['DOCUMENT_ROOT'] : __DIR__);
 if ($base_dir === false) {
     $base_dir = realpath(__DIR__);
 }
 
 // Current directory relative to base_dir
-$rel_path = $_GET['path'] ?? '';
+$rel_path = isset($_GET['path']) ? $_GET['path'] : '';
 $rel_path = trim($rel_path, '/\\');
 $abs_path = realpath($base_dir . DIRECTORY_SEPARATOR . $rel_path);
 
